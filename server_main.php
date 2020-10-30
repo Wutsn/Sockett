@@ -43,19 +43,8 @@ while (true) {
                 $handshake_check[$addr_port] = true;
                 #########################################################
             } else {
-                $bytes = socket_recv($read_socket, $buffer, 2048, 0); //software limit na 2048 bajtů (2kB)
-                /*$buffer = "";
-                while(true) {
-
-                }*/
-                    /*
-                   for ($i = 0; $i < strlen($buffer); $i++) {
-                       echo ord($buffer[$i]).',';
-                   }
-                   echo "\n";
-                   print($buffer);
-                   echo "\n";
-                   */
+                $bytes = socket_recv($read_socket, $buffer, 2048, 0); //software limit is 2030 bytes, 8 bytes are reserved for socket data, 10 bytes as reserve, if overflow -> error //still unsolved :(
+                srv_log("Original bytes: ". $bytes ." | Computed bytes: ". strlen($buffer) . " <-> \"".unmask($buffer)[0]."\"\n");
                 if ($bytes === false || (ord($buffer[0]) & 15) == 8) {
                     #############################################
                     unset($socket_list[$addr_port]);
@@ -63,15 +52,12 @@ while (true) {
                     socket_close($read_socket);
                     echo "<{$addr_port}>[Close]\n"; // <-> endpoint - client leave
                     $loop_data[] = "Client {$addr_port} left.";
+                    break;
                     #####################################################
                 } else {
                     ############################################
                     $msg = unmask($buffer)[0];
-                    $loop_data[] = "$addr_port <->".$msg;
-                    //$echo_msg = mask(json_encode($loop_data));
-                    //socket_write($read_socket, $echo_msg);
-                    //echo "<{$addr_port}>: {$msg}\n"; // <-> endpoint - client data
-                    //print(json_encode($loop_data)); print("\n");
+                    $loop_data[] = "$addr_port <->".$msg; // <-> endpoint - client data
                     #####################################################
                 }
             }
@@ -93,9 +79,10 @@ while (true) {
                 socket_write($r_cl, $echo_msg, strlen($echo_msg));
             }
         }
-        print(json_encode($loop_data)."\n");
+        print(json_encode($loop_data)." <-> test\n");
     }
     // end foreach
+    print("\n");
 }
 // end while
 function parse_header($str)
@@ -118,8 +105,7 @@ function handshake($socket)
     $upgrade = implode("\r\n", $upgrade);
     socket_write($socket, $upgrade);
 }
-function unmask($payload)
-{
+function unmask($payload) {
     $length = ord($payload[1]) & 127; //127
     if ($length == 126) {
         $masks = substr($payload, 4, 4);
@@ -137,10 +123,8 @@ function unmask($payload)
     }
     return array($text, $length);
 }
-function mask($text) //this piece of shit has "limit" 2040 bytes, probably socket limit
-{
-    // 0x1 text frame (FIN + opcode)
-    $b1 = 0x80 | 0x1 & 0xf;
+function mask($text) {
+    $b1 = 0x80 | 0x1 & 0xf; // 0x1 text frame (FIN + opcode)
     $length = strlen($text);
     if ($length <= 125) {
         $header = pack('CC', $b1, $length);
@@ -149,9 +133,11 @@ function mask($text) //this piece of shit has "limit" 2040 bytes, probably socke
         print("debug");
     } elseif ($length >= 65536) {
         print("debug2 \n");
-        $header = pack('CCxN', $b1, 127, 0, $length); //fix this shit pls
+        $header = pack('CCxN', $b1, 127, 0, $length);
     }
     return $header . $text;
 }
-
+function srv_log($data) {
+    print(date("H:i:s")." | ".$data);
+}
 ?>
