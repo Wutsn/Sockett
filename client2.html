@@ -9,6 +9,18 @@
 </style>
 
 <script>
+  var aaa;
+  function as_lauch(time, umsg) {
+    aaa = setInterval(function() {autosend(umsg)}, time);
+  }
+  function autosend(umsg) {
+    var txt;
+    txt = $("msg");
+    //if(!msg){ alert("Message can not be empty"); return; }
+    txt.value="";
+    txt.focus();
+    try{ socket.send(umsg); /*log('Sent: '+msg + "\n");*/ } catch(ex){ log(ex); }
+  }
 var socket;
 
 function init(){

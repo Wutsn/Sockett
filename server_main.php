@@ -79,14 +79,13 @@ while (true) {
                 socket_write($r_cl, $echo_msg, strlen($echo_msg));
             }
         }
-        print(json_encode($loop_data)." <-> test\n");
+        print(json_encode($loop_data)."\n");
     }
     // end foreach
     print("\n");
 }
 // end while
-function parse_header($str)
-{
+function parse_header($str) {
     $str = preg_replace('/\\r/', '', $str);
     preg_match_all('/^([^:\\n]+): (.*)$/m', $str, $matches);
     $header_list = array();
@@ -95,8 +94,7 @@ function parse_header($str)
     }
     return $header_list;
 }
-function handshake($socket)
-{
+function handshake($socket) {
     $bytes = socket_recv($socket, $buffer, 2048, 0);
     $header_list = parse_header($buffer);
     $accept = $header_list['Sec-WebSocket-Key'] . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
@@ -130,9 +128,7 @@ function mask($text) {
         $header = pack('CC', $b1, $length);
     } elseif ($length > 125 && $length < 65536) {
         $header = pack('CCn', $b1, 126, $length);
-        print("debug");
     } elseif ($length >= 65536) {
-        print("debug2 \n");
         $header = pack('CCxN', $b1, 127, 0, $length);
     }
     return $header . $text;
