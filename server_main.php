@@ -89,6 +89,7 @@ while (true) {
                                 $clients[$cl]["jmeno"] = $msg[2][0];
                                 $clients[$cl]["uid"] = $msg[2][1];
                             }
+                            
                         }
                     }
                     #####################################################
@@ -120,8 +121,10 @@ while (true) {
 function searchforclient($haystack, $needle) {
     if(count($haystack) != 0 ) {
         for($x = 0; $x < count($haystack); $x++) {
-            if($haystack[$x]["ip:"] == $needle) {
-                return $x;
+            if(isset($haystack[$x])) {
+                if($haystack[$x]["ip:"] == $needle) {
+                    return $x;
+                }
             }
         }
     }
@@ -178,4 +181,5 @@ function mask($text) {
 function srv_log($data) {
     print(date("H:i:s")." | \n").print_r($data);
 }
+
 ?>

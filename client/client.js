@@ -2,7 +2,7 @@ class klientt {
     constructor(jmeno, host) {
         this.jmeno = jmeno;
         this.host = host;
-        this.clid = GRS(5);
+        this.clid = this.GRS(5);
         this.memory = [];
         this.uepause = true;
     }
@@ -15,11 +15,11 @@ class klientt {
         this.socket.onmessage = function(msg) {
             var brmsg = msg.data;
             if(brmsg.includes("MSG-OK<->")) {
-                var msgkey = arr_find(superbridge.memory ,brmsg.substring(10,13));
+                var msgkey = superbridge.arr_find(superbridge.memory ,brmsg.substring(10,13));
                 superbridge.memory.splice(msgkey[0],1);
                 console.log(superbridge.memory);
             } else if(brmsg.includes("MSG-ERR<->")) {
-                var msgkey = arr_find(superbridge.memory ,brmsg.substring(11,14));
+                var msgkey = superbridge.arr_find(superbridge.memory ,brmsg.substring(11,14));
                 if(superbridge.memory[msgkey[0]][1] > 2) {
                     alert("Part of data frame dropped -> exiting. (3 attempts)");
                     superbridge.terminator(true);
@@ -50,18 +50,24 @@ class klientt {
                     }
                 }
             } else {
+                log(brmsg);
                 console.log(brmsg);
             }
         };
     }
     toast(msg) {
-        var dmsg = [this.jmeno, this.clid, msg];
-        var msgid = GRS(3);
-        var finmsg = msg_pack(dmsg, msgid);
-        //this.socket.send(finmsg);
-        this.memory.push([msgid,0,finmsg,false,0]);
-        this.memory.forEach(row => this.socket.send(row[2]));
-        console.log((this.memory));
+        var datalenght = msg.length;
+        if(datalenght <= 1900) {
+            var dmsg = [this.jmeno, this.clid, msg];
+            var msgid = this.GRS(3);
+            var finmsg = this.msg_pack(dmsg, msgid);
+            //this.socket.send(finmsg);
+            this.memory.push([msgid,0,finmsg,false,0]);
+            this.memory.forEach(row => this.socket.send(row[2]));
+            console.log((this.memory));
+        } else {
+            alert("data too long ("+datalenght+" | max: 1900) <-> fix needed!");
+        }
     }
     fail_toast(msg) {
         this.socket.send(msg);
@@ -74,6 +80,40 @@ class klientt {
             this.socket.close();
             this.socket = null;
         }
+    }
+    msg_pack(msg, id) {
+        var text = ["0000", id, msg];
+        text = JSON.stringify(text);
+        var textlen = text.length;
+        var textdata = text.replace(text.substring(2,6),("000" + textlen).slice(-4));
+        return textdata;
+    }
+    arr_find(haystack, needle) {  //max 2 dimensions
+        var haystacklen = haystack.length;
+        for(let x = 0; x < haystacklen-1; x++) {
+            if(Array.isArray(haystack[x])){
+                var haystacklen2 = haystack[x].length;
+                for(let y = 0; y < haystacklen2; y++) {
+                    if(haystack[x][y] == needle) {
+                        return [x,y];
+                    }
+                }
+            } else {
+                if(haystack[x] == needle) {
+                    return [x];
+                }
+            }
+        }
+        return false;
+    }
+    GRS(length) {
+        var result = '';
+        var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        var charactersLength = characters.length;
+        for ( var i = 0; i < length; i++ ) {
+           result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+        return result;
     }
 }
 
@@ -88,49 +128,11 @@ function stop() {
     klient.terminator(true);
 }
 function write(msgg) {
-    var datalenght = msgg.length;
-    if(datalenght <= 1900) {
-        klient.toast(msgg);
-    } else {
-        alert("data too long ("+datalenght+" | max: 1900) <-> fix needed!");
-    }
-}
-function msg_pack(msg, id) {
-    var text = ["0000", id, msg];
-    text = JSON.stringify(text);
-    var textlen = text.length;
-    var textdata = text.replace(text.substring(2,6),("000" + textlen).slice(-4));
-    return textdata;
+    klient.toast(msgg);
 }
 // Utilities
 
-function arr_find(haystack, needle) {  //max 2 dimensions
-    var haystacklen = haystack.length;
-    for(let x = 0; x < haystacklen-1; x++) {
-        if(Array.isArray(haystack[x])){
-            var haystacklen2 = haystack[x].length;
-            for(let y = 0; y < haystacklen2; y++) {
-                if(haystack[x][y] == needle) {
-                    return [x,y];
-                }
-            }
-        } else {
-            if(haystack[x] == needle) {
-                return [x];
-            }
-        }
-    }
-    return false;
-}
-function GRS(length) {
-    var result = '';
-    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
-       result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-}
 
-function log(msg){ document.getElementById("log").innerHTML+="\n"+msg; }
-function onkey(event){ if(event.keyCode==13){ write("aa"); } }
+function log(msg){ document.getElementById("log").innerHTML+=msg+"<br>"; }
+function onkey(event){ if(event.keyCode==13){ write(document.getElementById("msg").value); } }
+function txt_write() {write(document.getElementById("msg").value);}

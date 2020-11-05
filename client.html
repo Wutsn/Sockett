@@ -14,9 +14,10 @@
     <script src="client/client.js"></script>
     </head>
     <body>
-     <div id="log"></div>
+     <div id="log"></div><br>
+     <input id="msg" type="textbox" onkeypress="onkey(event)"/>
+     <button onclick="txt_write()">Send</button>
      <button onclick="start()">Connect</button>
-     <button onclick="write()">Send</button>
      <button onclick="stop()">Quit</button>
     </body>
     </html>
