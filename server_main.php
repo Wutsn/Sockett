@@ -1,4 +1,8 @@
 <?php 
+/*
+extension needed: mbstring
+
+*/
 #############################################################
 $main_socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 socket_set_option($main_socket, SOL_SOCKET, SO_REUSEADDR, 1);
@@ -7,6 +11,7 @@ socket_listen($main_socket);
 #########################################################################
 $socket_list = array('main' => $main_socket);
 $handshake_check = array();
+$clients = array();
 $srv_msg = array("server_data" => "Server version 1.2 - telnet");
 while (true) {
     $loop_data = array();
@@ -26,6 +31,8 @@ while (true) {
             $addr_port = "{$addr}:{$port}";
             $socket_list[$addr_port] = $sub_socket;
             echo "<{$addr_port}>[Connect]\n"; //<-> endpoint - client entry
+            $loop_data["msg"][] = "<{$addr_port}>[Connect]\n";
+            $clients[] = array("ip:" => $addr_port, "lastframe" => "");
             #############################################################
         } else {
             if(socket_getpeername($read_socket, $addr, $port) === false) {
@@ -34,30 +41,56 @@ while (true) {
                     unset($handshake_check[$addr_port]);
                     socket_close($read_socket);
                     echo "<{$addr_port}>[Close]\n"; // <-> endpoint - client leave
-                    $loop_data[] = "Client {$addr_port} left. (Not responding)";
+                    $loop_data["msg"][] = "Client {$addr_port} left. (Not responding)";
+                    unset($clients[searchforclient($clients, $addr_port)]);
             }
-            $addr_port = "{$addr}:{$port}";
+            $addr_port = "$addr:$port";
+            $cl = searchforclient($clients, $addr_port);
             if (!isset($handshake_check[$addr_port])) {
                 # ##############################################
                 handshake($read_socket);
                 $handshake_check[$addr_port] = true;
                 #########################################################
             } else {
-                $bytes = socket_recv($read_socket, $buffer, 2048, 0); //software limit is 2030 bytes, 8 bytes are reserved for socket data, 10 bytes as reserve, if overflow -> error //still unsolved :(
-                srv_log("Original bytes: ". $bytes ." | Computed bytes: ". strlen($buffer) . " <-> \"".unmask($buffer)[0]."\"\n");
+                $bytes = socket_recv($read_socket, $buffer, 2048, 0); //0 //software limit is 2040 bytes, 8 bytes are reserved for socket data, if overflow -> error //still unsolved :(
+                //srv_log("Original bytes: ". $bytes ." | Computed bytes: ". strlen($buffer) . " <-> \"".unmask($buffer)[0]."\"\n");
                 if ($bytes === false || (ord($buffer[0]) & 15) == 8) {
                     #############################################
                     unset($socket_list[$addr_port]);
                     unset($handshake_check[$addr_port]);
                     socket_close($read_socket);
                     echo "<{$addr_port}>[Close]\n"; // <-> endpoint - client leave
-                    $loop_data[] = "Client {$addr_port} left.";
+                    $loop_data["msg"][] = "Client {$addr_port} left.";
+                    unset($clients[$cl]);
                     break;
                     #####################################################
                 } else {
                     ############################################
-                    $msg = unmask($buffer)[0];
-                    $loop_data[] = "$addr_port <->".$msg; // <-> endpoint - client data
+                    $msg = json_decode(unmask($buffer)[0]);
+                    //srv_log($msg);
+                    if($msg == "") { //no data, possible error, overflow or something -> tell to client to send all unconfirmed messages
+                        $err_msg = mask(json_encode("UNKNOWN-ERR<->"));
+                        socket_write($read_socket, $err_msg, strlen($err_msg));
+                    } else {
+                        if(intval(substr(unmask($buffer)[0],2,6)) != mb_strlen(unmask($buffer)[0])) { //message got corrupted over the network, tell client to send this frame again
+                            $err_msg = mask(json_encode("MSG-ERR<->".$msg[1]));
+                            socket_write($read_socket, $err_msg, strlen($err_msg));
+                            break;
+                        } else { //message is ok, tell to client to forgot this good frame
+                            $suc_msg = mask(json_encode("MSG-OK<->".$msg[1]));
+                            socket_write($read_socket, $suc_msg, strlen($suc_msg));
+                            if($clients[$cl]["lastframe"] != $msg[1]) {
+                                $loop_data["clients"][$addr_port] = $msg; // <-> endpoint - client data
+                                $clients[$cl]["lastframe"] = $msg[1];
+                            } else {
+                                print("Skipping frame from $addr_port, duplicity.\n");
+                            }
+                            if(!isset($clients[$cl]["jmeno"])) {
+                                $clients[$cl]["jmeno"] = $msg[2][0];
+                                $clients[$cl]["uid"] = $msg[2][1];
+                            }
+                        }
+                    }
                     #####################################################
                 }
             }
@@ -78,13 +111,22 @@ while (true) {
                 }
                 socket_write($r_cl, $echo_msg, strlen($echo_msg));
             }
-        }
-        print(json_encode($loop_data)."\n");
+        }print_r($loop_data).print("\n<- loop data ->\n");
     }
     // end foreach
     print("\n");
 }
 // end while
+function searchforclient($haystack, $needle) {
+    if(count($haystack) != 0 ) {
+        for($x = 0; $x < count($haystack); $x++) {
+            if($haystack[$x]["ip:"] == $needle) {
+                return $x;
+            }
+        }
+    }
+    return null;
+ }
 function parse_header($str) {
     $str = preg_replace('/\\r/', '', $str);
     preg_match_all('/^([^:\\n]+): (.*)$/m', $str, $matches);
@@ -134,6 +176,6 @@ function mask($text) {
     return $header . $text;
 }
 function srv_log($data) {
-    print(date("H:i:s")." | ".$data);
+    print(date("H:i:s")." | \n").print_r($data);
 }
 ?>
