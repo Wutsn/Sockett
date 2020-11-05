@@ -16,7 +16,7 @@ class klientt {
             if(brmsg.includes("MSG-OK<->")) { //if ok, just forget msg
                 var msgkey = superbridge.arr_find(superbridge.memory ,brmsg.substring(10,13));
                 superbridge.memory.splice(msgkey[0],1);
-                console.log(superbridge.memory);
+                //console.log(superbridge.memory);
             } else if(brmsg.includes("MSG-ERR<->")) { //if err, resend 3 times (msgid is ok, but part of msg got currupted over the network or sth)
                 var msgkey = superbridge.arr_find(superbridge.memory ,brmsg.substring(11,14));
                 if(superbridge.memory[msgkey[0]][1] > 2) {
@@ -63,7 +63,7 @@ class klientt {
             //this.socket.send(finmsg);
             this.memory.push([msgid,0,finmsg,false,0]);
             this.memory.forEach(row => this.socket.send(row[2]));
-            console.log((this.memory));
+            //console.log((this.memory));
         } else {
             alert("data too long ("+datalenght+" | max: 1900) <-> fix needed!");
         }
